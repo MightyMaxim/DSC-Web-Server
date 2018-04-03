@@ -1,9 +1,13 @@
 ﻿# Copyright 2018, Maksim Krupnov
 #
-# Version 1.0
+# Version 1.1
 # 
 
 param (
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    [string] $SecureHTTP,
+
     [Parameter(Mandatory)]
     [ValidateNotNullOrEmpty()]
     [string] $RegKey,
@@ -25,6 +29,14 @@ param (
     [array]  $ConfigNames
 )
 
+if ($SecureHTTP -eq "1") {
+    $DSCServerURL = "https://" + $DSCPullServerName + ":8080/PSDSCPullServer.svc"
+    $AllowUnsecure = $false
+} else {
+    $DSCServerURL = "http://" + $DSCPullServerName + ":8080/PSDSCPullServer.svc"
+    $AllowUnsecure = $true
+}
+
 [DSCLocalConfigurationManager()]
 
 Configuration LCM_HTTPSPULL 
@@ -40,20 +52,16 @@ Configuration LCM_HTTPSPULL
         }
  
         ConfigurationRepositoryWeb PullServer {
-            ServerURL = "https://" + $DSCPullServerName + ":8080/PSDSCPullServer.svc"
-#for HTTP   ServerURL = "http://" + $DSCPullServerName + ":8080/PSDSCPullServer.svc"
+            ServerURL = $DSCServerURL
             RegistrationKey = $RegKey
             ConfigurationNames = $ConfigNames 
-            AllowUnsecureConnection = $false
-#for HTTP   AllowUnsecureConnection = $true
+            AllowUnsecureConnection = $AllowUnsecure
         }
 
         ResourceRepositoryWeb PullServerModules {
-            ServerURL = "https://" + $DSCPullServerName + ":8080/PSDSCPullServer.svc"
-#for HTTP   ServerURL = "http://" + $DSCPullServerName + ":8080/PSDSCPullServer.svc"
+            ServerURL = $DSCServerURL
             RegistrationKey = $RegKey
-            AllowUnsecureConnection = $false
-#for HTTP   AllowUnsecureConnection = $true
+            AllowUnsecureConnection = $AllowUnsecure
         }
 	}
 }
