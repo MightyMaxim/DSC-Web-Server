@@ -1,6 +1,6 @@
 ﻿# Copyright 2018, Maksim Krupnov
 #
-# Version 1.0
+# Version 1.1
 # Run step by step
 
 # Install DSC Server Setup Module
@@ -9,10 +9,13 @@ Install-Module xPSDesiredStateConfiguration
 Set-ExecutionPolicy Unrestricted
 
 
-# Setup Variables
-$DSCPullServerName ="mcesapdsc1"
+# Set general variables
+
 $DomainName = "mceinc.net"
+
+$DSCPullServerName ="mcesapdsc1"
 $DSCPullServerCredentials = Get-Credential -Credential "sap\administrator"
+
 $ScriptFolder = "C:\GitHub\DSC-Web-Server\"
 $DSCConfigurationFolder = "c$\Program Files\WindowsPowerShell\DscService\Configuration"
 $MOFFolder = "C:\DSC\HTTPS\"
@@ -45,56 +48,37 @@ Start-DscConfiguration -Path $MOFFolder -ComputerName $DSCPullServerName -Force 
 
 ######################### Initial LCM configuration for PULL server ##########################
 
-$ConfigNames = "PullServerConfig"
-
 # Generate Reg key
 Invoke-Command -Computername $DSCPullServerName `
                -Credential $DSCPullServerCredentials `
                {(New-Guid).Guid | 
                 Out-File "$Env:ProgramFiles\WindowsPowerShell\DscService\RegistrationKeys.txt" -Append}
-# Get Reg key
-$DSCPullServerRegKey = Invoke-Command -Computername $DSCPullServerName `
-                                      -Credential $DSCPullServerCredentials `
-                                      {Get-Content "$Env:ProgramFiles\WindowsPowerShell\DscService\RegistrationKeys.txt"}
-
-# Show RegKey
-$DSCPullServerRegKey
-
-# Generate META MOF file
-powershell -File ($ScriptFolder + "DSCLCM_HTTPSPull.ps1") -Path $MOFFolder -DSCPullServerName $DSCPullServerName -NodeName $DSCPullServerName -ConfigNames $ConfigNames -Regkey $DSCPullServerRegKey -SecureHTTP 0
-
-# Check result - Show MOF folder
-Explorer $MOFFolder
-
-# Send LCM
-Set-DSCLocalConfigurationManager -ComputerName $DSCPullServerName -Credential $DSCPullServerCredentials -Path $MOFFolder –Verbose
 
 ######################### LCM configuration for any node ##########################
 
-$ServerName = "mcesapad1"
-$ConfigNames = "DCServerConfig"
+$LCMServerName = "mcesapad2"
+$LCMConfigNames = "DCServerConfig"
 
 # Get Reg key
 $DSCPullServerRegKey = Invoke-Command -Computername $DSCPullServerName `
                                       -Credential $DSCPullServerCredentials `
                                       {Get-Content "$Env:ProgramFiles\WindowsPowerShell\DscService\RegistrationKeys.txt"}
-
 # Show RegKey
 $DSCPullServerRegKey
 
 # Generate META MOF file
-powershell -File ($ScriptFolder + "DSCLCM_HTTPSPull.ps1") -Path $MOFFolder -DSCPullServerName $DSCPullServerName -NodeName $ServerName -ConfigNames $ConfigNames -Regkey $DSCPullServerRegKey -SecureHTTP 0
+powershell -File ($ScriptFolder + "DSCLCM_HTTPSPull.ps1") -Path $MOFFolder -DSCPullServerName $DSCPullServerName -NodeName $LCMServerName -ConfigNames $LCMConfigNames -Regkey $DSCPullServerRegKey -SecureHTTP 0
 
 # Check result - Show MOF folder
 Explorer $MOFFolder
 
 # Send LCM
-Set-DSCLocalConfigurationManager -ComputerName $ServerName -Credential $DSCPullServerCredentials -Path $MOFFolder –Verbose
+Set-DSCLocalConfigurationManager -ComputerName $LCMServerName -Credential $DSCPullServerCredentials -Path $MOFFolder –Verbose
 
 ######################### PULL configuration for any server ##########################
 
-$ServerName = "mcesapad1"
-$ConfigName = "PullServerConfig"
+$PullConfigName = "PullServerConfig"
+$DCConfigName   = "DCServerConfig"
 
 $DSCPullServerCert = Invoke-Command -Computername $DSCPullServerName `
                                     -Credential $DSCPullServerCredentials `
@@ -104,11 +88,18 @@ $DSCPullServerCert = Invoke-Command -Computername $DSCPullServerName `
 # Show Cert
 $DSCPullServerCert 
 
-# Generate initial PUSH MOF file
-powershell -File ($ScriptFolder + "DSC" + $ConfigName + ".ps1") -Path $MOFFolder -NodeName $ConfigName -Cert $DSCPullServerCert
+New-PSDrive -Name "T" -PSProvider "FileSystem" -Root ("\\" + $DSCPullServerName + "\" + $DSCConfigurationFolder) -Credential $DSCPullServerCredential
+
+# Generate PULLConfig MOF file
+powershell -File ($ScriptFolder + "DSC" + $PullConfigName + ".ps1") -Path $MOFFolder -NodeName $PullConfigName -Cert $DSCPullServerCert
+Copy-Item –Path ($MOFFolder + $PullConfigName + ".*") –Destination ("T:\")
+
+# Generate DCConfig MOF file
+powershell -File ($ScriptFolder + "DSC" + $DCConfigName + ".ps1") -Path $MOFFolder -NodeName $DCConfigName 
+Copy-Item –Path ($MOFFolder + $DCConfigName + ".*") –Destination ("T:\")
 
 # Check result - Show MOF folder
-Explorer $MOFFolder
+dir t:\
 
 Copy-Item –Path ($MOFFolder + $ConfigName + ".*") –Destination ("\\" + $DSCPullServerName + "\" + $DSCConfigurationFolder)
 
@@ -116,14 +107,18 @@ Copy-Item –Path ($MOFFolder + $ConfigName + ".*") –Destination ("\\" + $DSCP
 Explorer ("\\" + $DSCPullServerName + "\" + $DSCConfigurationFolder)
 
 # Force to UPDATE Server Configuration manualy
-Update-DscConfiguration -ComputerName $ServerName -Credential $Credentials -Wait -Verbose   #Check to see if it installs
+
+$UpdateServerName = "mcesapad2"
+$UpdateServerCredentials = Get-Credential "sap\administrator"
+
+Update-DscConfiguration -ComputerName $UpdateServerName -Credential $UpdateServerCredentials -Wait -Verbose   #Check to see if it installs
 
 ######################### CHECK LCM and PULL configuration for any server ##########################
 
-$ServerName = "mcesapdsc1"
-$Credentials = Get-Credential -Credential "sap\administrator"
+$TestServerName = "mcesapad2"
+$TestServerCredentials = Get-Credential -Credential "sap\administrator"
 
-$Session = New-CimSession -ComputerName $ServerName -Credential $Credential
+$Session = New-CimSession -ComputerName $TestServerName -Credential $TestServerCredentials
 
 Get-DscConfiguration -CimSession $Session
 
@@ -132,3 +127,5 @@ Get-DscLocalConfigurationManager -CimSession $Session
 # TO cleanup pull server configuration
 
 Remove-DscConfigurationDocument -Stage Current -CimSession $Session
+
+Invoke-Command -Computername $TestServerName -Credential $TestServerCredentials {Get-WindowsFeature | Format-Table}
