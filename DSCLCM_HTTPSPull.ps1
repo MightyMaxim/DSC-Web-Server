@@ -40,8 +40,8 @@ Configuration LCM_HTTPSPULL
         }
  
         ConfigurationRepositoryWeb PullServer {
-            ServerURL = "https:// + $DSCPullServerName + :8080/PSDSCPullServer.svc"
-#for HTTP   ServerURL = "http:// + $DSCPullServerName + :8080/PSDSCPullServer.svc"
+            ServerURL = "https://" + $DSCPullServerName + ":8080/PSDSCPullServer.svc"
+#for HTTP   ServerURL = "http://" + $DSCPullServerName + ":8080/PSDSCPullServer.svc"
             RegistrationKey = $RegKey
             ConfigurationNames = $ConfigNames 
             AllowUnsecureConnection = $false
@@ -50,7 +50,7 @@ Configuration LCM_HTTPSPULL
 
         ResourceRepositoryWeb PullServerModules {
             ServerURL = "https://" + $DSCPullServerName + ":8080/PSDSCPullServer.svc"
-#for HTTP   ServerURL = "http:// + $DSCPullServerName + :8080/PSDSCPullServer.svc"
+#for HTTP   ServerURL = "http://" + $DSCPullServerName + ":8080/PSDSCPullServer.svc"
             RegistrationKey = $RegKey
             AllowUnsecureConnection = $false
 #for HTTP   AllowUnsecureConnection = $true
