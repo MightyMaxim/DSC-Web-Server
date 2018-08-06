@@ -11,12 +11,12 @@ Set-ExecutionPolicy Unrestricted
 
 # Set general variables
 
-$DomainName = "mceinc.net"
+$DomainName = "krupfamily.net"
 
-$DSCPullServerName ="mcesapdsc1"
-$DSCPullServerCredentials = Get-Credential -Credential "sap\administrator"
+$DSCPullServerName ="home-dsc1"
+$DSCPullServerCredentials = Get-Credential -Credential "krupfamily.net\administrator"
 
-$ScriptFolder = "C:\GitHub\DSC-Web-Server\"
+$ScriptFolder = "C:\GitHub\DSCServer\DSC-Web-Server\"
 $DSCConfigurationFolder = "c$\Program Files\WindowsPowerShell\DscService\Configuration"
 $MOFFolder = "C:\DSC\HTTPS\"
 
@@ -79,6 +79,7 @@ Set-DSCLocalConfigurationManager -ComputerName $LCMServerName -Credential $DSCPu
 
 $PullConfigName = "PullServerConfig"
 $DCConfigName   = "DCServerConfig"
+$FileConfigName   = "FileServerConfig"
 
 $DSCPullServerCert = Invoke-Command -Computername $DSCPullServerName `
                                     -Credential $DSCPullServerCredentials `
@@ -90,13 +91,18 @@ $DSCPullServerCert
 
 New-PSDrive -Name "T" -PSProvider "FileSystem" -Root ("\\" + $DSCPullServerName + "\" + $DSCConfigurationFolder) -Credential $DSCPullServerCredential
 
-# Generate PULLConfig MOF file
+######### Generate PULLConfig MOF file
 powershell -File ($ScriptFolder + "DSC" + $PullConfigName + ".ps1") -Path $MOFFolder -NodeName $PullConfigName -Cert $DSCPullServerCert
 Copy-Item –Path ($MOFFolder + $PullConfigName + ".*") –Destination ("T:\")
 
-# Generate DCConfig MOF file
+######### Generate DCConfig MOF file
 powershell -File ($ScriptFolder + "DSC" + $DCConfigName + ".ps1") -Path $MOFFolder -NodeName $DCConfigName 
 Copy-Item –Path ($MOFFolder + $DCConfigName + ".*") –Destination ("T:\")
+
+######### Generate FileConfig MOF file
+powershell -File ($ScriptFolder + "DSC" + $FileConfigName + ".ps1") -Path $MOFFolder -NodeName $FileConfigName 
+Copy-Item –Path ($MOFFolder + $FileConfigName + ".*") –Destination ("T:\")
+
 
 # Check result - Show MOF folder
 dir t:\
@@ -108,8 +114,8 @@ Explorer ("\\" + $DSCPullServerName + "\" + $DSCConfigurationFolder)
 
 # Force to UPDATE Server Configuration manualy
 
-$UpdateServerName = "mcesapad2"
-$UpdateServerCredentials = Get-Credential "sap\administrator"
+$UpdateServerName = "home-fs1"
+$UpdateServerCredentials = Get-Credential "krupfamily.net\administrator"
 
 Update-DscConfiguration -ComputerName $UpdateServerName -Credential $UpdateServerCredentials -Wait -Verbose   #Check to see if it installs
 
